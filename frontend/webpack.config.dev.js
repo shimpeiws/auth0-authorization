@@ -26,5 +26,8 @@ module.exports = {
     contentBase: path.join(__dirname, "./dist"),
     watchContentBase: true,
     port: 3000,
+    historyApiFallback: {
+      rewrites: [{ from: /^\/$/, to: "" }],
+    },
   },
 };
