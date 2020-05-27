@@ -38,8 +38,8 @@ export const hello: APIGatewayProxyHandler = async (event) => {
   };
 };
 
-export const adminUsers: APIGatewayProxyHandler = async () => {
-  const resToken = await axios.post(
+const managementAPIToken = async () => {
+  const res = await axios.post(
     `https://${process.env.AUTH0_DOMAIN}/oauth/token`,
     {
       grant_type: "client_credentials",
@@ -49,6 +49,11 @@ export const adminUsers: APIGatewayProxyHandler = async () => {
     },
     { headers: { "'content-type'": "application/x-www-form-urlencoded" } }
   );
+  return res.data.access_token;
+};
+
+export const adminUsers: APIGatewayProxyHandler = async () => {
+  const resToken = await managementAPIToken();
   const resSearchUsers = await axios.get(
     `https://${process.env.AUTH0_DOMAIN}/api/v2/users`,
     {
@@ -58,7 +63,7 @@ export const adminUsers: APIGatewayProxyHandler = async () => {
       },
       headers: {
         "Content-Type": "application/json",
-        authorization: `Bearer ${resToken.data.access_token}`,
+        authorization: `Bearer ${resToken}`,
       },
     }
   );
@@ -67,6 +72,53 @@ export const adminUsers: APIGatewayProxyHandler = async () => {
     statusCode: 200,
     body: JSON.stringify({
       users: resSearchUsers.data,
+    }),
+  };
+};
+
+export const putUser: APIGatewayProxyHandler = async (event) => {
+  if (!event.headers["Authorization"]) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({}),
+    };
+  }
+  const authorization = event.headers["Authorization"];
+  const bearer = authorization.split(" ");
+  if (bearer.length < 1) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({}),
+    };
+  }
+  console.info("bearer", bearer);
+  const token = bearer[1];
+  const res = await axios.get(`https://${process.env.AUTH0_DOMAIN}/userinfo/`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  console.info("res", res);
+  const resToken = await managementAPIToken();
+  const resUpdateUser = await axios.patch(
+    `https://${process.env.AUTH0_DOMAIN}/api/v2/users/${res.data.sub}`,
+    {
+      app_metadata: {
+        roles: ["admin"],
+      },
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${resToken}`,
+      },
+    }
+  );
+  console.info("resUpdateUser", resUpdateUser.data);
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: resUpdateUser.data,
     }),
   };
 };
